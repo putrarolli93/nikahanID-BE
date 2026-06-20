@@ -1,0 +1,60 @@
+const InvitationModel = require('../models/InvitationModel');
+const { successResponse, errorResponse } = require('../utils/responseHelper');
+
+class InvitationController {
+  async getBySlug(req, res, next) {
+    try {
+      const { slug } = req.params;
+      const invitation = await InvitationModel.getBySlug(slug);
+      
+      if (!invitation) return errorResponse(res, 'Undangan tidak ditemukan', 404);
+      
+      successResponse(res, { data: invitation });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async uploadMoments(req, res, next) {
+    try {
+      const { weddingId } = req.params;
+      const { type = 'gallery' } = req.body; // Mengambil type dari body (slider atau gallery)
+
+      if (!req.files || req.files.length === 0) {
+        return errorResponse(res, 'Tidak ada file yang diunggah', 400);
+      }
+
+      // Ambil path file yang tersimpan
+      const photoPaths = req.files.map(file => `/uploads/moments/${file.filename}`);
+      
+      await InvitationModel.addMoments(weddingId, photoPaths, type);
+      
+      successResponse(res, { message: `Foto berhasil ditambahkan ke ${type}`, data: photoPaths }, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async upsertBrideGroom(req, res, next) {
+    try {
+      const { weddingId, type } = req.params;
+      const data = { ...req.body };
+
+      // Jika ada file foto yang diunggah, tambahkan path-nya ke data
+      if (req.file) {
+        data.photo_url = `/uploads/profiles/${req.file.filename}`;
+      }
+
+      const result = await InvitationModel.upsertBrideGroom(weddingId, type, data);
+      if (!result) {
+        return errorResponse(res, 'Tidak ada data untuk disimpan atau diperbarui', 400);
+      }
+
+      successResponse(res, { message: `Data mempelai ${type} berhasil disimpan/diperbarui`, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+module.exports = new InvitationController();
