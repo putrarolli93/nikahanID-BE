@@ -55,6 +55,74 @@ class InvitationController {
       next(error);
     }
   }
+
+  async addLoveStory(req, res, next) {
+    try {
+      const { weddingId } = req.params;
+      const { title, story_date, description, order_index } = req.body;
+
+      if (!title || !description) {
+        return errorResponse(res, 'Judul (title) dan keterangan (description) harus diisi', 400);
+      }
+
+      const data = {
+        title,
+        story_date,
+        description,
+        order_index: order_index ? parseInt(order_index) : 0,
+        photo_url: req.file ? `/uploads/stories/${req.file.filename}` : null
+      };
+
+      const insertId = await InvitationModel.addLoveStory(weddingId, data);
+      
+      successResponse(res, {
+        message: 'Cerita perjalanan cinta berhasil ditambahkan',
+        data: { id: insertId, ...data }
+      }, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateLoveStory(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { title, story_date, description, order_index } = req.body;
+
+      const data = {};
+      if (title !== undefined) data.title = title;
+      if (story_date !== undefined) data.story_date = story_date;
+      if (description !== undefined) data.description = description;
+      if (order_index !== undefined) data.order_index = parseInt(order_index);
+      if (req.file) {
+        data.photo_url = `/uploads/stories/${req.file.filename}`;
+      }
+
+      const result = await InvitationModel.updateLoveStory(id, data);
+      if (!result) {
+        return errorResponse(res, 'Cerita tidak ditemukan atau tidak ada data yang diperbarui', 404);
+      }
+
+      successResponse(res, { message: 'Cerita perjalanan cinta berhasil diperbarui', data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteLoveStory(req, res, next) {
+    try {
+      const { id } = req.params;
+      const result = await InvitationModel.deleteLoveStory(id);
+      
+      if (!result) {
+        return errorResponse(res, 'Cerita tidak ditemukan', 404);
+      }
+
+      successResponse(res, { message: 'Cerita perjalanan cinta berhasil dihapus' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new InvitationController();

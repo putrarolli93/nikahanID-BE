@@ -4,8 +4,8 @@ class TemplateModel {
   static async getAll(filters = {}) {
     let query = `
       SELECT 
-        id, name, slug, thumbnail_url, preview_url, 
-        category, is_premium, is_active,
+        id, name, slug, thumbnail_url, preview_url, preview_url_mobile, 
+        category, is_premium, is_active, description, price, features,
         CASE WHEN is_premium = 1 THEN 'Pro' ELSE 'Gratis' END as price_type
       FROM templates 
       WHERE is_active = 1
@@ -36,7 +36,7 @@ class TemplateModel {
   
   static async getById(id) {
     const query = `
-      SELECT id, name, slug, thumbnail_url, preview_url, category, is_premium, is_active
+      SELECT id, name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features
       FROM templates 
       WHERE id = ? AND is_active = 1
     `;
@@ -46,7 +46,7 @@ class TemplateModel {
   
   static async getBySlug(slug) {
     const query = `
-      SELECT id, name, slug, thumbnail_url, preview_url, category, is_premium, is_active
+      SELECT id, name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features
       FROM templates 
       WHERE slug = ? AND is_active = 1
     `;
@@ -67,12 +67,14 @@ class TemplateModel {
   
   static async create(data) {
     const query = `
-      INSERT INTO templates (name, slug, thumbnail_url, preview_url, category, is_premium, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO templates (name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await db.execute(query, [
-      data.name, data.slug, data.thumbnail_url, data.preview_url,
-      data.category, data.is_premium || 0, data.is_active || 1
+      data.name, data.slug, data.thumbnail_url, data.preview_url, data.preview_url_mobile,
+      data.category, data.is_premium || 0, data.is_active || 1,
+      data.description || null, data.price || 0,
+      data.features ? JSON.stringify(data.features) : null
     ]);
     return result.insertId;
   }
@@ -80,13 +82,17 @@ class TemplateModel {
   static async update(id, data) {
     const query = `
       UPDATE templates 
-      SET name = ?, slug = ?, thumbnail_url = ?, preview_url = ?, 
-          category = ?, is_premium = ?, is_active = ?
+      SET name = ?, slug = ?, thumbnail_url = ?, preview_url = ?, preview_url_mobile = ?,
+          category = ?, is_premium = ?, is_active = ?,
+          description = ?, price = ?, features = ?
       WHERE id = ?
     `;
     const [result] = await db.execute(query, [
-      data.name, data.slug, data.thumbnail_url, data.preview_url,
-      data.category, data.is_premium, data.is_active, id
+      data.name, data.slug, data.thumbnail_url, data.preview_url, data.preview_url_mobile,
+      data.category, data.is_premium, data.is_active,
+      data.description || null, data.price || 0,
+      data.features ? JSON.stringify(data.features) : null,
+      id
     ]);
     return result.affectedRows > 0;
   }

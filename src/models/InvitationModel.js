@@ -28,7 +28,8 @@ class InvitationModel {
       moments,
       music,
       giftInfo,
-      guestAttendance
+      guestAttendance,
+      loveStories
     ] = await Promise.all([
       db.execute('SELECT * FROM bride_groom WHERE wedding_id = ?', [weddingId]),
       db.execute('SELECT * FROM quotes WHERE wedding_id = ?', [weddingId]),
@@ -37,7 +38,8 @@ class InvitationModel {
       db.execute('SELECT * FROM moments WHERE wedding_id = ? ORDER BY id ASC', [weddingId]),
       db.execute('SELECT * FROM music WHERE wedding_id = ?', [weddingId]),
       db.execute('SELECT * FROM gift_info WHERE wedding_id = ?', [weddingId]),
-      db.execute('SELECT * FROM guest_attendance WHERE wedding_id = ? ORDER BY comment_date DESC', [weddingId])
+      db.execute('SELECT * FROM guest_attendance WHERE wedding_id = ? ORDER BY comment_date DESC', [weddingId]),
+      db.execute('SELECT * FROM love_stories WHERE wedding_id = ? ORDER BY order_index ASC', [weddingId])
     ]);
 
     // Khusus untuk gift_info, kita ambil juga data bank_account-nya jika ada
@@ -59,7 +61,8 @@ class InvitationModel {
       moments: moments[0],
       music: music[0] ? music[0][0] : null, // Biasanya cuma 1 lagu
       gifts: gifts,
-      comments: guestAttendance[0]
+      comments: guestAttendance[0],
+      love_stories: loveStories[0]
     };
   }
 
@@ -105,6 +108,36 @@ class InvitationModel {
     }
 
     const [result] = await db.execute(query, queryParams);
+    return result.affectedRows > 0;
+  }
+
+  static async addLoveStory(weddingId, data) {
+    const { title, story_date, description, photo_url, order_index = 0 } = data;
+    const query = `
+      INSERT INTO love_stories (wedding_id, title, story_date, description, photo_url, order_index)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `;
+    const [result] = await db.execute(query, [weddingId, title, story_date, description, photo_url, order_index]);
+    return result.insertId;
+  }
+
+  static async updateLoveStory(id, data) {
+    const allowedFields = ['title', 'story_date', 'description', 'photo_url', 'order_index'];
+    const fieldsToUpdate = Object.keys(data).filter(key => allowedFields.includes(key));
+    if (fieldsToUpdate.length === 0) return false;
+
+    const setClause = fieldsToUpdate.map(key => `${key} = ?`).join(', ');
+    const queryParams = fieldsToUpdate.map(key => data[key]);
+    queryParams.push(id);
+
+    const query = `UPDATE love_stories SET ${setClause} WHERE id = ?`;
+    const [result] = await db.execute(query, queryParams);
+    return result.affectedRows > 0;
+  }
+
+  static async deleteLoveStory(id) {
+    const query = 'DELETE FROM love_stories WHERE id = ?';
+    const [result] = await db.execute(query, [id]);
     return result.affectedRows > 0;
   }
 }
