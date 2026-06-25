@@ -1,13 +1,21 @@
 const db = require('../config/database');
 
 class InvitationModel {
+  static async getById(id) {
+    const query = `SELECT * FROM wedding_info WHERE id = ?`;
+    const [rows] = await db.execute(query, [id]);
+    return rows[0];
+  }
+
   static async getBySlug(slug) {
     const query = `
       SELECT 
         wi.*, 
         t.name as template_name, 
         t.slug as template_slug,
-        t.preview_url as template_preview_url
+        t.preview_url as template_preview_url,
+        t.price as template_price,
+        t.is_premium as template_is_premium
       FROM wedding_info wi
       JOIN templates t ON wi.template_id = t.id
       WHERE wi.slug = ? AND (wi.status = 'active' OR wi.status = 'draft')
@@ -64,6 +72,24 @@ class InvitationModel {
       comments: guestAttendance[0],
       love_stories: loveStories[0]
     };
+  }
+
+  static async getByUserId(userId) {
+    const query = `
+      SELECT 
+        wi.id, wi.slug, wi.title, wi.status, wi.created_at, wi.updated_at,
+        t.name as template_name, 
+        t.slug as template_slug,
+        t.preview_url as template_preview_url,
+        t.price as template_price,
+        t.is_premium as template_is_premium
+      FROM wedding_info wi
+      LEFT JOIN templates t ON wi.template_id = t.id
+      WHERE wi.user_id = ?
+      ORDER BY wi.updated_at DESC
+    `;
+    const [rows] = await db.execute(query, [userId]);
+    return rows;
   }
 
   static async addMoments(weddingId, photoPaths, type = 'gallery') {

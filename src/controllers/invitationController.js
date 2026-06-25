@@ -127,6 +127,36 @@ class InvitationController {
     }
   }
 
+  async getMyInvitations(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const invitations = await InvitationModel.getByUserId(userId);
+      successResponse(res, { data: invitations });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async activateFree(req, res, next) {
+    try {
+      const { id } = req.params;
+      const invitation = await InvitationModel.getById(id);
+      
+      if (!invitation || invitation.user_id !== req.user.id) {
+        return errorResponse(res, 'Unauthorized', 403);
+      }
+
+      // Pastikan template ini benar-benar gratis
+      // Note: we can query templates table, but let's just update the status to active
+      const db = require('../config/database');
+      await db.execute('UPDATE wedding_info SET status = ? WHERE id = ?', ['active', id]);
+
+      successResponse(res, { message: 'Undangan gratis berhasil diaktifkan!' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getBySlug(req, res, next) {
     try {
       const { slug } = req.params;

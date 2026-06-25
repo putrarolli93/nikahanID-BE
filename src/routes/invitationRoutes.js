@@ -7,6 +7,7 @@ const uploadStory = require('../middleware/storyUploadMiddleware'); // Impor mid
 const authMiddleware = require('../middleware/authMiddleware'); // Impor auth middleware
 const uploadAvatar = require('../middleware/avatarUploadMiddleware');
 const uploadMusic = require('../middleware/musicUploadMiddleware');
+const guestController = require('../controllers/guestController');
 
 // Endpoint untuk mengambil default avatars (public)
 router.get('/default-avatars', invitationController.getDefaultAvatars);
@@ -35,8 +36,14 @@ router.post('/default-cover-quotes', invitationController.addDefaultCoverQuote);
 // Endpoint untuk mengunggah avatar default baru
 router.post('/default-avatars', uploadAvatar.single('photo'), invitationController.uploadDefaultAvatar);
 
+// Endpoint untuk mengambil undangan milik user yang sedang login
+router.get('/my-invitations', authMiddleware, invitationController.getMyInvitations);
+
 // Endpoint untuk mengambil data undangan berdasarkan slug
 router.get('/:slug', invitationController.getBySlug);
+
+// Endpoint untuk mengaktifkan undangan gratis
+router.post('/:id/activate-free', authMiddleware, invitationController.activateFree);
 
 // Endpoint untuk mengirim ucapan/doa/kehadiran tamu (public)
 router.post('/:weddingId/comments', invitationController.addComment);
@@ -69,5 +76,12 @@ router.put('/:weddingId/gifts', authMiddleware, invitationController.updateGifts
 router.post('/:weddingId/love-stories', uploadStory.single('photo'), invitationController.addLoveStory);
 router.put('/love-stories/:id', uploadStory.single('photo'), invitationController.updateLoveStory);
 router.delete('/love-stories/:id', invitationController.deleteLoveStory);
+
+// Endpoint untuk daftar tamu (guest list & share WA)
+router.get('/:id/guests', authMiddleware, guestController.getGuests);
+router.post('/:id/guests', authMiddleware, guestController.addGuest);
+router.put('/:id/guests/:guestId/mark-sent', authMiddleware, guestController.markAsSent);
+router.delete('/:id/guests/:guestId', authMiddleware, guestController.deleteGuest);
+router.put('/:id/wa-message', authMiddleware, guestController.updateMessage);
 
 module.exports = router;
