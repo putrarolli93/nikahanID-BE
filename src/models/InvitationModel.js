@@ -10,7 +10,7 @@ class InvitationModel {
         t.preview_url as template_preview_url
       FROM wedding_info wi
       JOIN templates t ON wi.template_id = t.id
-      WHERE wi.slug = ? AND wi.status = 'active'
+      WHERE wi.slug = ? AND (wi.status = 'active' OR wi.status = 'draft')
     `;
     const [rows] = await db.execute(query, [slug]);
     const invitation = rows[0];
@@ -139,6 +139,207 @@ class InvitationModel {
     const query = 'DELETE FROM love_stories WHERE id = ?';
     const [result] = await db.execute(query, [id]);
     return result.affectedRows > 0;
+  }
+
+  static async createDraft(userId, templateId, slug, groomName, brideName, akadDate, akadTime, hasResepsi, resepsiDate, resepsiTime) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Insert into wedding_info
+      const title = `The Wedding of ${groomName} & ${brideName}`;
+      const queryWedding = `
+        INSERT INTO wedding_info (user_id, template_id, slug, title, status)
+        VALUES (?, ?, ?, ?, 'draft')
+      `;
+      const [resultWedding] = await connection.execute(queryWedding, [userId, templateId, slug, title]);
+      const weddingId = resultWedding.insertId;
+
+      // 2. Insert into bride_groom (groom)
+      const queryGroom = `
+        INSERT INTO bride_groom (wedding_id, type, full_name)
+        VALUES (?, 'groom', ?)
+      `;
+      await connection.execute(queryGroom, [weddingId, groomName]);
+
+      // 3. Insert into bride_groom (bride)
+      const queryBride = `
+        INSERT INTO bride_groom (wedding_id, type, full_name)
+        VALUES (?, 'bride', ?)
+      `;
+      await connection.execute(queryBride, [weddingId, brideName]);
+
+      // 4. Insert into event_schedule (Akad)
+      const queryAkad = `
+        INSERT INTO event_schedule (wedding_id, event_name, event_date, start_time)
+        VALUES (?, 'Akad Nikah', ?, ?)
+      `;
+      await connection.execute(queryAkad, [weddingId, akadDate, akadTime]);
+
+      // 5. Insert into event_schedule (Resepsi, if hasResepsi)
+      if (hasResepsi && resepsiDate && resepsiTime) {
+        const queryResepsi = `
+          INSERT INTO event_schedule (wedding_id, event_name, event_date, start_time)
+          VALUES (?, 'Resepsi', ?, ?)
+        `;
+        await connection.execute(queryResepsi, [weddingId, resepsiDate, resepsiTime]);
+      }
+
+      await connection.commit();
+      return { id: weddingId, slug };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async upsertEventSchedule(weddingId, schedules) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      for (const schedule of schedules) {
+        const { event_name, event_address, google_map_link, event_date, start_time } = schedule;
+        const [existing] = await connection.execute(
+          'SELECT id FROM event_schedule WHERE wedding_id = ? AND event_name = ?',
+          [weddingId, event_name]
+        );
+        if (existing.length > 0) {
+          await connection.execute(
+            `UPDATE event_schedule 
+             SET event_address = ?, google_map_link = ?, event_date = ?, start_time = ?
+             WHERE wedding_id = ? AND event_name = ?`,
+            [event_address || null, google_map_link || null, event_date || null, start_time || null, weddingId, event_name]
+          );
+        } else {
+          await connection.execute(
+            `INSERT INTO event_schedule (wedding_id, event_name, event_address, google_map_link, event_date, start_time)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [weddingId, event_name, event_address || null, google_map_link || null, event_date || null, start_time || null]
+          );
+        }
+      }
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async upsertQuotes(weddingId, data) {
+    const { content, source } = data;
+    const [existing] = await db.execute('SELECT id FROM quotes WHERE wedding_id = ?', [weddingId]);
+    if (existing.length > 0) {
+      const [res] = await db.execute(
+        'UPDATE quotes SET content = ?, source = ? WHERE wedding_id = ?',
+        [content, source || null, weddingId]
+      );
+      return res.affectedRows > 0;
+    } else {
+      const [res] = await db.execute(
+        'INSERT INTO quotes (wedding_id, content, source) VALUES (?, ?, ?)',
+        [weddingId, content, source || null]
+      );
+      return res.insertId > 0;
+    }
+  }
+
+  static async upsertBlessings(weddingId, blessings) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      for (const blessing of blessings) {
+        const { type, content } = blessing;
+        const [existing] = await connection.execute(
+          'SELECT id FROM blessings WHERE wedding_id = ? AND type = ?',
+          [weddingId, type]
+        );
+        if (existing.length > 0) {
+          await connection.execute(
+            'UPDATE blessings SET content = ? WHERE wedding_id = ? AND type = ?',
+            [content, weddingId, type]
+          );
+        } else {
+          await connection.execute(
+            'INSERT INTO blessings (wedding_id, type, content) VALUES (?, ?, ?)',
+            [weddingId, type, content]
+          );
+        }
+      }
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
+  static async upsertMusic(weddingId, data) {
+    const { title, artist, url, autoplay = true } = data;
+    const [existing] = await db.execute('SELECT id FROM music WHERE wedding_id = ?', [weddingId]);
+    if (existing.length > 0) {
+      const [res] = await db.execute(
+        'UPDATE music SET title = ?, artist = ?, url = ?, autoplay = ? WHERE wedding_id = ?',
+        [title || null, artist || null, url || null, autoplay ? 1 : 0, weddingId]
+      );
+      return res.affectedRows > 0;
+    } else {
+      const [res] = await db.execute(
+        'INSERT INTO music (wedding_id, title, artist, url, autoplay) VALUES (?, ?, ?, ?, ?)',
+        [weddingId, title || null, artist || null, url || null, autoplay ? 1 : 0]
+      );
+      return res.insertId > 0;
+    }
+  }
+
+  static async upsertGifts(weddingId, giftData) {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      
+      const { title = "Titip Hadiah", message, shipping_address, bank_accounts = [] } = giftData;
+      
+      // 1. Upsert gift_info
+      let giftId;
+      const [existingGift] = await connection.execute('SELECT id FROM gift_info WHERE wedding_id = ?', [weddingId]);
+      if (existingGift.length > 0) {
+        giftId = existingGift[0].id;
+        await connection.execute(
+          'UPDATE gift_info SET title = ?, message = ?, shipping_address = ? WHERE id = ?',
+          [title, message || null, shipping_address || null, giftId]
+        );
+      } else {
+        const [res] = await connection.execute(
+          'INSERT INTO gift_info (wedding_id, title, message, shipping_address) VALUES (?, ?, ?, ?)',
+          [weddingId, title, message || null, shipping_address || null]
+        );
+        giftId = res.insertId;
+      }
+
+      // 2. Delete existing bank accounts for this giftId and re-insert
+      await connection.execute('DELETE FROM bank_account WHERE gift_id = ?', [giftId]);
+      for (const acc of bank_accounts) {
+        const { bank_name, account_number, account_holder, notes } = acc;
+        await connection.execute(
+          'INSERT INTO bank_account (gift_id, bank_name, account_number, account_holder, notes) VALUES (?, ?, ?, ?, ?)',
+          [giftId, bank_name, account_number, account_holder, notes || null]
+        );
+      }
+      
+      await connection.commit();
+      return true;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   }
 }
 

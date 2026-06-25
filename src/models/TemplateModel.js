@@ -6,7 +6,7 @@ class TemplateModel {
       SELECT 
         id, name, slug, thumbnail_url, preview_url, preview_url_mobile, 
         category, is_premium, is_active, description, price, features,
-        CASE WHEN is_premium = 1 THEN 'Pro' ELSE 'Gratis' END as price_type
+        CASE WHEN is_premium = 1 THEN 'Standar' ELSE 'Gratis' END as price_type
       FROM templates 
       WHERE is_active = 1
     `;
