@@ -40,10 +40,14 @@ router.post('/default-avatars', uploadAvatar.single('photo'), invitationControll
 router.get('/my-invitations', authMiddleware, invitationController.getMyInvitations);
 
 // Endpoint untuk mengambil data undangan berdasarkan slug
+router.get('/check-slug/:slug', invitationController.checkSlug);
 router.get('/:slug', invitationController.getBySlug);
 
 // Endpoint untuk mengaktifkan undangan gratis
 router.post('/:id/activate-free', authMiddleware, invitationController.activateFree);
+
+// Endpoint Admin untuk mengaktifkan undangan premium (memproses komisi)
+router.post('/:id/activate-premium', invitationController.activatePremium);
 
 // Endpoint untuk mengirim ucapan/doa/kehadiran tamu (public)
 router.post('/:weddingId/comments', invitationController.addComment);

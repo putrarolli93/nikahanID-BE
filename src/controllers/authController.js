@@ -101,6 +101,47 @@ class AuthController {
       next(error);
     }
   }
+
+  async changePassword(req, res, next) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.user.id;
+
+      if (!currentPassword || !newPassword) {
+        return errorResponse(res, 'Password lama dan password baru wajib diisi', 400);
+      }
+
+      // Check current password
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        return errorResponse(res, 'User tidak ditemukan', 404);
+      }
+
+      const db = require('../config/database');
+      const [rows] = await db.execute('SELECT password FROM users WHERE id = ?', [userId]);
+      if (rows.length === 0) {
+        return errorResponse(res, 'User tidak ditemukan', 404);
+      }
+
+      const isMatch = await bcrypt.compare(currentPassword, rows[0].password);
+      if (!isMatch) {
+        return errorResponse(res, 'Password lama salah', 400);
+      }
+
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      // Update password
+      await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
+
+      return successResponse(res, {
+        message: 'Password berhasil diubah'
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new AuthController();

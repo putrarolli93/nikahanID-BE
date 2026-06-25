@@ -41,4 +41,16 @@ router.post(
 // Route: Get Profile (Me)
 router.get('/me', authMiddleware, authController.me);
 
+// Route: Change Password
+router.put(
+  '/change-password',
+  authMiddleware,
+  [
+    body('currentPassword').notEmpty().withMessage('Password lama wajib diisi'),
+    body('newPassword').isLength({ min: 6 }).withMessage('Password baru minimal 6 karakter'),
+    validate
+  ],
+  authController.changePassword
+);
+
 module.exports = router;

@@ -3,44 +3,46 @@ const TemplateModel = require('../models/TemplateModel');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 
 class InvitationController {
+  // Check slug availability
+  async checkSlug(req, res, next) {
+    try {
+      const { slug } = req.params;
+      if (!slug) return errorResponse(res, 'Slug wajib diisi', 400);
+
+      const db = require('../config/database');
+      const [rows] = await db.execute('SELECT id FROM wedding_info WHERE slug = ?', [slug]);
+      
+      if (rows.length > 0) {
+        return errorResponse(res, 'URL sudah digunakan', 400);
+      }
+      
+      successResponse(res, { message: 'URL tersedia' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Step 1: Create initial draft (Schedules & Groom/Bride Names)
   async createDraft(req, res, next) {
     try {
-      const { templateSlug, groomName, brideName, akadDate, akadTime, hasResepsi, resepsiDate, resepsiTime } = req.body;
       const userId = req.user.id;
+      const { templateSlug, slug: requestedSlug, groomName, brideName, akadDate, akadTime, hasResepsi, resepsiDate, resepsiTime } = req.body;
 
-      if (!templateSlug || !groomName || !brideName || !akadDate || !akadTime) {
-        return errorResponse(res, 'Mempelai pria, mempelai wanita, tanggal akad, dan jam akad harus diisi.', 400);
+      if (!templateSlug || !groomName || !brideName || !akadDate || !akadTime || !requestedSlug) {
+        return errorResponse(res, 'Semua data wajib termasuk URL harus diisi.', 400);
       }
 
       // Look up template_id
       const template = await TemplateModel.getBySlug(templateSlug);
       const templateId = template ? template.id : 1; // Fallback to 1 (Amore)
 
-      // Generate unique slug
-      const slugify = (text) => {
-        return text.toString().toLowerCase().trim()
-          .replace(/\s+/g, '-')
-          .replace(/[^\w\-]+/g, '')
-          .replace(/\-\-+/g, '-');
-      };
-
-      const baseSlug = `${slugify(groomName)}-dan-${slugify(brideName)}`;
-      let slug = baseSlug;
-      let isUnique = false;
-      let attempts = 0;
       const db = require('../config/database');
-
-      while (!isUnique && attempts < 10) {
-        const checkQuery = 'SELECT id FROM wedding_info WHERE slug = ?';
-        const [rows] = await db.execute(checkQuery, [slug]);
-        if (rows.length === 0) {
-          isUnique = true;
-        } else {
-          const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-          slug = `${baseSlug}-${randomSuffix}`;
-          attempts++;
-        }
+      const [rows] = await db.execute('SELECT id FROM wedding_info WHERE slug = ?', [requestedSlug]);
+      if (rows.length > 0) {
+        return errorResponse(res, 'URL sudah digunakan, silakan pilih URL lain', 400);
       }
+
+      let slug = requestedSlug;
 
       const result = await InvitationModel.createDraft(
         userId, templateId, slug, groomName, brideName, akadDate, akadTime, hasResepsi, resepsiDate, resepsiTime
@@ -152,6 +154,84 @@ class InvitationController {
       await db.execute('UPDATE wedding_info SET status = ? WHERE id = ?', ['active', id]);
 
       successResponse(res, { message: 'Undangan gratis berhasil diaktifkan!' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async activatePremium(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { promo_code } = req.body;
+
+      const db = require('../config/database');
+
+      // Check wedding info
+      const [weddings] = await db.execute(`
+        SELECT w.id, w.title, t.price as template_price 
+        FROM wedding_info w
+        LEFT JOIN templates t ON w.template_id = t.id
+        WHERE w.id = ?
+      `, [id]);
+
+      if (weddings.length === 0) {
+        return errorResponse(res, 'Undangan tidak ditemukan.', 404);
+      }
+
+      const wedding = weddings[0];
+
+      const connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      let commissionProcessed = false;
+      let resellerName = null;
+      let commissionAmount = 0;
+
+      try {
+        // Set active
+        await connection.execute('UPDATE wedding_info SET status = ? WHERE id = ?', ['active', id]);
+
+        // Jika ada kode promo, proses komisi 15%
+        if (promo_code && promo_code.trim() !== '') {
+          const [users] = await connection.execute('SELECT id, name FROM users WHERE referral_code = ?', [promo_code]);
+          
+          if (users.length > 0) {
+            const resellerId = users[0].id;
+            const templatePrice = parseFloat(wedding.template_price) || 0;
+            commissionAmount = templatePrice * 0.15; // 15%
+
+            if (commissionAmount > 0) {
+              await connection.execute('UPDATE users SET commission_balance = commission_balance + ? WHERE id = ?', [commissionAmount, resellerId]);
+              
+              await connection.execute(
+                'INSERT INTO commissions (reseller_id, wedding_title, template_price, amount) VALUES (?, ?, ?, ?)',
+                [resellerId, wedding.title, templatePrice, commissionAmount]
+              );
+              
+              commissionProcessed = true;
+              resellerName = users[0].name;
+            }
+          }
+        }
+
+        await connection.commit();
+        
+        successResponse(res, {
+          message: 'Undangan Premium berhasil diaktifkan.',
+          data: {
+            wedding_id: id,
+            status: 'active',
+            commission_processed: commissionProcessed,
+            reseller: resellerName,
+            commission_amount: commissionAmount
+          }
+        });
+      } catch (err) {
+        await connection.rollback();
+        throw err;
+      } finally {
+        connection.release();
+      }
     } catch (error) {
       next(error);
     }
