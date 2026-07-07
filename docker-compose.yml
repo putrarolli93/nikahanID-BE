@@ -27,7 +27,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - DB_HOST=database
+      - DB_HOST=${DB_HOST:-database}
       - DB_USER=root
       - DB_PASSWORD=${DB_PASSWORD:-5elamanya}
       - DB_NAME=${DB_NAME:-wedding_invitation}
