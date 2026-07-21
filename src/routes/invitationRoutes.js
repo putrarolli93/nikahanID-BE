@@ -7,6 +7,7 @@ const uploadStory = require('../middleware/storyUploadMiddleware'); // Impor mid
 const authMiddleware = require('../middleware/authMiddleware'); // Impor auth middleware
 const uploadAvatar = require('../middleware/avatarUploadMiddleware');
 const uploadMusic = require('../middleware/musicUploadMiddleware');
+const uploadSelfie = require('../middleware/selfieUploadMiddleware');
 const guestController = require('../controllers/guestController');
 
 // Endpoint untuk mengambil default avatars (public)
@@ -87,5 +88,12 @@ router.post('/:id/guests', authMiddleware, guestController.addGuest);
 router.put('/:id/guests/:guestId/mark-sent', authMiddleware, guestController.markAsSent);
 router.delete('/:id/guests/:guestId', authMiddleware, guestController.deleteGuest);
 router.put('/:id/wa-message', authMiddleware, guestController.updateMessage);
+
+// QR Check-in & Live Selfie Guestbook routes
+router.put('/guests/check-in/:passcode', guestController.checkIn);
+router.get('/guests/check-status/:passcode', guestController.checkStatus);
+router.post('/:weddingId/comments-with-selfie', uploadSelfie.single('photo_selfie'), invitationController.addCommentWithSelfie);
+router.get('/:weddingId/live-feed', invitationController.getLiveFeed);
+router.delete('/:weddingId/comments/:commentId', authMiddleware, invitationController.deleteComment);
 
 module.exports = router;

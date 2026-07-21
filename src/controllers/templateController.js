@@ -126,7 +126,8 @@ class TemplateController {
         is_active: req.body.is_active !== undefined ? parseInt(req.body.is_active) : existingTemplate.is_active,
         description: req.body.description !== undefined ? req.body.description : existingTemplate.description,
         price: req.body.price !== undefined ? parseInt(req.body.price) || 0 : existingTemplate.price,
-        features: req.body.features !== undefined ? req.body.features : existingTemplate.features
+        features: req.body.features !== undefined ? req.body.features : existingTemplate.features,
+        is_guestbook_active: req.body.is_guestbook_active !== undefined ? parseInt(req.body.is_guestbook_active) : existingTemplate.is_guestbook_active
       };
 
       // Parse features update

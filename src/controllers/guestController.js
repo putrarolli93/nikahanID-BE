@@ -33,8 +33,8 @@ exports.addGuest = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Unauthorized' });
     }
 
-    const insertId = await GuestModel.addGuest(weddingId, { name, phone_number });
-    res.status(201).json({ success: true, message: 'Tamu ditambahkan', data: { id: insertId, name, phone_number, is_sent: 0 } });
+    const { insertId, passcode } = await GuestModel.addGuest(weddingId, { name, phone_number });
+    res.status(201).json({ success: true, message: 'Tamu ditambahkan', data: { id: insertId, name, phone_number, passcode, is_sent: 0, is_checked_in: 0 } });
   } catch (error) {
     next(error);
   }
@@ -95,6 +95,34 @@ exports.updateMessage = async (req, res, next) => {
 
     await GuestModel.updateCustomMessage(weddingId, custom_wa_msg);
     res.status(200).json({ success: true, message: 'Template pesan WA disimpan' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.checkIn = async (req, res, next) => {
+  try {
+    const { passcode } = req.params;
+    const guest = await GuestModel.getByPasscode(passcode);
+    if (!guest) {
+      return res.status(404).json({ success: false, message: 'Tamu tidak ditemukan' });
+    }
+
+    await GuestModel.checkIn(passcode);
+    res.status(200).json({ success: true, message: 'Check-in berhasil', data: { ...guest, is_checked_in: 1 } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.checkStatus = async (req, res, next) => {
+  try {
+    const { passcode } = req.params;
+    const guest = await GuestModel.getByPasscode(passcode);
+    if (!guest) {
+      return res.status(404).json({ success: false, message: 'Tamu tidak ditemukan' });
+    }
+    res.status(200).json({ success: true, data: guest });
   } catch (error) {
     next(error);
   }

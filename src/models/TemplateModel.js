@@ -6,6 +6,7 @@ class TemplateModel {
       SELECT 
         id, name, slug, thumbnail_url, preview_url, preview_url_mobile, 
         category, is_premium, is_active, description, price, features,
+        is_guestbook_active,
         CASE WHEN is_premium = 1 THEN 'Premium' ELSE 'Gratis' END as price_type
       FROM templates 
       WHERE is_active = 1
@@ -36,7 +37,7 @@ class TemplateModel {
   
   static async getById(id) {
     const query = `
-      SELECT id, name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features
+      SELECT id, name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features, is_guestbook_active
       FROM templates 
       WHERE id = ? AND is_active = 1
     `;
@@ -46,7 +47,7 @@ class TemplateModel {
   
   static async getBySlug(slug) {
     const query = `
-      SELECT id, name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features
+      SELECT id, name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features, is_guestbook_active
       FROM templates 
       WHERE slug = ? AND is_active = 1
     `;
@@ -67,14 +68,15 @@ class TemplateModel {
   
   static async create(data) {
     const query = `
-      INSERT INTO templates (name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO templates (name, slug, thumbnail_url, preview_url, preview_url_mobile, category, is_premium, is_active, description, price, features, is_guestbook_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const [result] = await db.execute(query, [
       data.name, data.slug, data.thumbnail_url, data.preview_url, data.preview_url_mobile,
       data.category, data.is_premium || 0, data.is_active || 1,
       data.description || null, data.price || 0,
-      data.features ? JSON.stringify(data.features) : null
+      data.features ? JSON.stringify(data.features) : null,
+      data.is_guestbook_active || 0
     ]);
     return result.insertId;
   }
@@ -84,7 +86,7 @@ class TemplateModel {
       UPDATE templates 
       SET name = ?, slug = ?, thumbnail_url = ?, preview_url = ?, preview_url_mobile = ?,
           category = ?, is_premium = ?, is_active = ?,
-          description = ?, price = ?, features = ?
+          description = ?, price = ?, features = ?, is_guestbook_active = ?
       WHERE id = ?
     `;
     const [result] = await db.execute(query, [
@@ -92,6 +94,7 @@ class TemplateModel {
       data.category, data.is_premium, data.is_active,
       data.description || null, data.price || 0,
       data.features ? JSON.stringify(data.features) : null,
+      data.is_guestbook_active !== undefined ? data.is_guestbook_active : 0,
       id
     ]);
     return result.affectedRows > 0;

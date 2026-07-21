@@ -384,6 +384,58 @@ class InvitationController {
     }
   }
 
+  async addCommentWithSelfie(req, res, next) {
+    try {
+      const { weddingId } = req.params;
+      const { guest_name, will_attend, jumlah_tamu, message, passcode } = req.body;
+
+      if (!guest_name) {
+        return errorResponse(res, 'Nama tamu wajib diisi', 400);
+      }
+
+      let photoSelfieUrl = null;
+      if (req.file) {
+        photoSelfieUrl = `/uploads/selfies/${req.file.filename}`;
+      }
+
+      const db = require('../config/database');
+      const query = `
+        INSERT INTO guest_attendance (wedding_id, guest_name, will_attend, jumlah_tamu, message, photo_selfie_url, passcode)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `;
+      await db.execute(query, [
+        weddingId,
+        guest_name,
+        will_attend !== undefined && will_attend !== 'null' && will_attend !== '' ? parseInt(will_attend) : null,
+        jumlah_tamu !== undefined ? parseInt(jumlah_tamu) : 1,
+        message || null,
+        photoSelfieUrl,
+        passcode || null
+      ]);
+
+      successResponse(res, { message: 'Ucapan & selfie berhasil dikirim', photo_selfie_url: photoSelfieUrl }, 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getLiveFeed(req, res, next) {
+    try {
+      const { weddingId } = req.params;
+      const db = require('../config/database');
+      const [rows] = await db.execute(
+        `SELECT id, guest_name, message, photo_selfie_url, comment_date 
+         FROM guest_attendance 
+         WHERE wedding_id = ? AND photo_selfie_url IS NOT NULL 
+         ORDER BY comment_date DESC`,
+        [weddingId]
+      );
+      successResponse(res, { data: rows });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteLoveStory(req, res, next) {
     try {
       const { id } = req.params;
@@ -568,6 +620,31 @@ class InvitationController {
       const [result] = await db.execute('INSERT INTO default_cover_quotes (content, source) VALUES (?, ?)', [content, source || null]);
       successResponse(res, { message: 'Kutipan sampul default berhasil ditambahkan', data: { id: result.insertId, content, source: source || null } }, 201);
     } catch (error) { next(error); }
+  }
+
+  async deleteComment(req, res, next) {
+    try {
+      const { weddingId, commentId } = req.params;
+      const db = require('../config/database');
+      
+      // Verify ownership
+      const [weddings] = await db.execute('SELECT id, user_id FROM wedding_info WHERE id = ?', [weddingId]);
+      if (weddings.length === 0) {
+        return errorResponse(res, 'Undangan tidak ditemukan', 404);
+      }
+      if (weddings[0].user_id !== req.user.id) {
+        return errorResponse(res, 'Akses tidak sah', 403);
+      }
+
+      const [result] = await db.execute('DELETE FROM guest_attendance WHERE id = ? AND wedding_id = ?', [commentId, weddingId]);
+      if (result.affectedRows > 0) {
+        successResponse(res, { message: 'Komentar/ucapan berhasil dihapus' });
+      } else {
+        errorResponse(res, 'Komentar tidak ditemukan', 404);
+      }
+    } catch (error) {
+      next(error);
+    }
   }
 }
 

@@ -15,7 +15,8 @@ class InvitationModel {
         t.slug as template_slug,
         t.preview_url as template_preview_url,
         t.price as template_price,
-        t.is_premium as template_is_premium
+        t.is_premium as template_is_premium,
+        t.is_guestbook_active as template_is_guestbook_active
       FROM wedding_info wi
       JOIN templates t ON wi.template_id = t.id
       WHERE wi.slug = ? AND (wi.status = 'active' OR wi.status = 'draft')
@@ -82,7 +83,12 @@ class InvitationModel {
         t.slug as template_slug,
         t.preview_url as template_preview_url,
         t.price as template_price,
-        t.is_premium as template_is_premium
+        t.is_premium as template_is_premium,
+        t.is_guestbook_active as template_is_guestbook_active,
+        (SELECT COUNT(*) FROM guests WHERE wedding_id = wi.id) as total_guests,
+        (SELECT COUNT(*) FROM guests WHERE wedding_id = wi.id AND is_checked_in = 1) as checked_in_guests,
+        (SELECT COUNT(*) FROM guest_attendance WHERE wedding_id = wi.id AND passcode IS NOT NULL AND passcode <> '') as total_wishes,
+        (SELECT COUNT(*) FROM guest_attendance WHERE wedding_id = wi.id AND passcode IS NOT NULL AND passcode <> '' AND photo_selfie_url IS NOT NULL AND photo_selfie_url <> '') as selfie_wishes
       FROM wedding_info wi
       LEFT JOIN templates t ON wi.template_id = t.id
       WHERE wi.user_id = ?
