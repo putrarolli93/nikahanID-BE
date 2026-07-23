@@ -31,7 +31,7 @@ class AuthController {
 
       // Generate JWT Token
       const token = jwt.sign(
-        { id: user.id, email: user.email },
+        { id: user.id, email: user.email, role: user.role || 'user' },
         process.env.JWT_SECRET || 'your_super_secret_key_change_this',
         { expiresIn: process.env.JWT_EXPIRE || '7d' }
       );
@@ -66,7 +66,7 @@ class AuthController {
 
       // Generate JWT Token
       const token = jwt.sign(
-        { id: user.id, email: user.email },
+        { id: user.id, email: user.email, role: user.role || 'user' },
         process.env.JWT_SECRET || 'your_super_secret_key_change_this',
         { expiresIn: process.env.JWT_EXPIRE || '7d' }
       );

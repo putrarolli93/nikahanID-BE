@@ -18,9 +18,15 @@ class UserModel {
   }
 
   static async findById(id) {
-    const query = 'SELECT id, name, email, phone, created_at, email_verified_at FROM users WHERE id = ?';
+    const query = 'SELECT id, name, email, phone, role, created_at, email_verified_at FROM users WHERE id = ?';
     const [rows] = await db.execute(query, [id]);
     return rows[0];
+  }
+
+  static async getAllUsers() {
+    const query = 'SELECT id, name, email, phone, role, created_at FROM users ORDER BY id DESC';
+    const [rows] = await db.execute(query);
+    return rows;
   }
 }
 
