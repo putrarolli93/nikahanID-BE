@@ -66,6 +66,18 @@ class InvitationController {
         return errorResponse(res, 'Format data jadwal tidak valid', 400);
       }
 
+      // Delete schedules that are NOT in the incoming list
+      // This prevents stale schedules (e.g. "Akad Nikah" for aqiqah invitations) from lingering
+      const incomingNames = schedules.map(s => s.event_name).filter(Boolean);
+      if (incomingNames.length > 0) {
+        const db = require('../config/database');
+        const placeholders = incomingNames.map(() => '?').join(', ');
+        await db.execute(
+          `DELETE FROM event_schedule WHERE wedding_id = ? AND event_name NOT IN (${placeholders})`,
+          [weddingId, ...incomingNames]
+        );
+      }
+
       await InvitationModel.upsertEventSchedule(weddingId, schedules);
       successResponse(res, { message: 'Jadwal acara berhasil diperbarui' });
     } catch (error) {
